@@ -93,6 +93,15 @@
 
 	var STANDARD_RESPONSE_SIZE = 22;
 	var DAC_CTRL_RATE_CHANGE = 0x8000;
+	var CALLBACK_DELAY = 1;
+
+	var parseUInt16 = function(c0,c1) {
+		return c1 * 256 + c0;
+	}
+
+	var parseUInt32 = function(c0,c1,c2,c3) {
+		return (c3 * 256 * 256 * 256) + (c2 * 256 * 256) + (c1 * 256) + c0;
+	}
 
 	var parseStandardResponse = function(data) {
 		var st = {
@@ -104,10 +113,17 @@
 				protocol: data[2],
 				light_engine_state: data[3],
 				playback_state: data[4],
-				source: data[5]
+				source: data[5],
+				light_engine_flags: parseUInt16(data[6],data[7]),
+				playback_flags: parseUInt16(data[8],data[9]),
+				source_flags: parseUInt16(data[10],data[11]),
+				buffer_fullness: parseUInt16(data[12],data[13]),
+				point_rate: parseUInt32(data[14],data[15],data[16],data[17]),
+				point_count: parseUInt32(data[18],data[19],data[20],data[21])
 			}
 		};
 		st.success = st.response == 'a';
+		st.str = 'resp='+st.response+',fullness='+st.status.buffer_fullness+',raw='+data;
 		return st;
 	};
 
@@ -117,7 +133,10 @@
 		this.inputqueue = [];
 		this.timer = 0;
 		this.acks = 0;
+		this.fullness = 0;
+		this.points_in_buffer = 0;
 		this.begun = false;
+		this.playsent = false;
 		this._send = function(sendcommand, responsesize, sendcallback) {
 			self.queue.push({
 				sent: false,
@@ -161,14 +180,14 @@
 
 						setTimeout(function() {
 							self._popqueue();
-						}, 1);
+						}, 0);
 					}
 				}
 			}
 			if (self.inputqueue.length > 0) {
 				setTimeout(function() {
 					self._popinputqueue();
-				}, 1);
+				}, 0);
 			}
 		}
 		// this._queuecomm
@@ -186,22 +205,9 @@
 				//'connect' listener
 				console.log('SOCKET CONNECT: client connected');
 
-				self._send(null, STANDARD_RESPONSE_SIZE, function(data) {
+				self._send('?', STANDARD_RESPONSE_SIZE, function(data) {
 					var st = parseStandardResponse(data);
-					// console.log('got initial status', data, st);
-
-					self._send('p', STANDARD_RESPONSE_SIZE, function(data2) {
-						var st2 = parseStandardResponse(data2);
-						// console.log('got p', data2, st2);
-
-						self._send('v', 32, function(data2) {
-							// console.log('got version', data2.toString());
-
-							setTimeout(function() {
-								callback(true);
-							}, 1);
-						});
-					});
+					callback(true);
 				});
 
 				self._popqueue();
@@ -221,7 +227,7 @@
 
 			setTimeout(function() {
 				callback(false);
-			}, 1);
+			}, 0);
 		});
 
 		this.client.on('end', function() {
@@ -266,52 +272,52 @@
 		// console.log('n-points', data.length);
 		// console.log('draw rate', speed);
 
-		data[0].control = (data[0].control || 0) | DAC_CTRL_RATE_CHANGE;
+		// data[0].control = (data[0].control || 0) | DAC_CTRL_RATE_CHANGE;
+
+		// queue command
+		// packeddata += 'q';
+		// packeddata += writeUnsignedInt16(speed); // rate
+		// packeddata += writeUnsignedInt16(0); // low watermark?
+		// packeddata += writeUnsignedInt32(speed); // rate
+		// this.acks ++;
 
 		var self = this;
 		var packeddata = '';
 
 		var offset = 0;
-		var left = data.length;
+		// var left = data.length;
 
-		while(offset < data.length) {
+		// while(offset < data.length) {
 
-			var batch = Math.min( 80, left ); // data.length
-			if (batch > 0) {
+		var batch = data.length; // Math.min( 50000, left ); // data.length
+		// if (batch > 0) {
+		// var offset = 0;
+		// data command header
+		packeddata += 'd';
+		packeddata += writeUnsignedInt16(batch); // npoints
 
-				// queue command
-				packeddata += 'q';
-				packeddata += writeUnsignedInt16(speed); // rate
-				packeddata += writeUnsignedInt16(0); // low watermark?
-				// packeddata += writeUnsignedInt32(speed); // rate
-
-				// var offset = 0;
-
-				// data command header
-				packeddata += 'd';
-				packeddata += writeUnsignedInt16(batch); // npoints
-
-				// points
-				for (var i=0; i<batch; i++) {
-					var p = data[offset + i];
-					packeddata += writeUnsignedInt16(p.control || 0);
-					packeddata += writeSignedInt16(p.x || 0);
-					packeddata += writeSignedInt16(p.y || 0);
-					packeddata += writeUnsignedInt16(p.r || 0);
-					packeddata += writeUnsignedInt16(p.g || 0);
-					packeddata += writeUnsignedInt16(p.b || 0);
-					packeddata += writeUnsignedInt16(p.i || 0);
-					packeddata += writeUnsignedInt16(p.u1 || 0);
-					packeddata += writeUnsignedInt16(p.u2 || 0);
-				}
-
-				left -= batch;
-				offset += batch;
-
-				self.acks ++;
-			}
+		// points
+		for (var i=0; i<batch; i++) {
+			var p = data[offset + i];
+			packeddata += writeUnsignedInt16(p.control || 0);
+			packeddata += writeSignedInt16(p.x || 0);
+			packeddata += writeSignedInt16(p.y || 0);
+			packeddata += writeUnsignedInt16(p.r || 0);
+			packeddata += writeUnsignedInt16(p.g || 0);
+			packeddata += writeUnsignedInt16(p.b || 0);
+			packeddata += writeUnsignedInt16(p.i || 0);
+			packeddata += writeUnsignedInt16(p.u1 || 0);
+			packeddata += writeUnsignedInt16(p.u2 || 0);
 		}
 
+		// left -= batch;
+		// offset += batch;
+
+		// self.acks ++;
+		// }
+		// }
+
+		/*
 		function waitack() {
 			// console.log('waiting for '+self.acks+' acks...');
 			self._send(null, STANDARD_RESPONSE_SIZE, function(data2) {
@@ -320,56 +326,65 @@
 				if ((st.response == 'a' || st.response == 'I') && st.command == 'd') {
 					self.acks --;
 					if (self.acks > 0) {
-						var st2 = parseStandardResponse(data2);
+						// var st2 = parseStandardResponse(data2);
 						// console.log('got status 2', data2, st2);
 						setTimeout(function() {
 							waitack();
-						}, 0);
+						}, CALLBACK_DELAY);
 					} else {
-
-						if (self.begun) {
-
-							setTimeout(function() {
-								// send one begin?
-								callback(self);
-							}, 0);
-
-						} else {
-							//	self.begun =
-								//  if (st3.status.playback_state == 0)
-								// console.log('got begin', data3, st3);
-
-								setTimeout(function() {
-									// send one begin?
-									callback(self);
-								}, 0);
-						}
+						setTimeout(function() {
+							callback(self);
+						}, CALLBACK_DELAY);
 					}
-				} else {
-					setTimeout(function() {
-						waitack();
-					}, 0);
 				}
 			});
 		}
-		var begincommand = 'b' + writeUnsignedInt16(0) + writeUnsignedInt32(speed);
-		// console.log('Sending begin command: ' + JSON.stringify(begincommand) );
-		self._send(begincommand, STANDARD_RESPONSE_SIZE, function(data3) {
-			var st3 = parseStandardResponse(data3);
+		*/
 
-			self._send('p', STANDARD_RESPONSE_SIZE, function(data3) {
-				var st3 = parseStandardResponse(data3);
-				//  if (st3.status.playback_state == 0)
-				// console.log('got p', data3, st3);
-
-				self._send(packeddata, 0, function(data) {
-					// console.log('sent frame packet');
-					waitack();
+		if (self.playsent) {
+			self._send(packeddata, STANDARD_RESPONSE_SIZE, function(data) {
+				// var st3 = parseStandardResponse(data);
+				// console.log('buffer returned', st3.str);
+				// console.log('sent frame packet');
+				// waitack();
+				self._send('p', STANDARD_RESPONSE_SIZE, function(data3) {
+					var st3 = parseStandardResponse(data3);
+					// console.log('play returned', st3.str);
+					self.fullness = st3.status.buffer_fullness;
+					self.points_in_buffer = st3.status.point_count;
+					// var st3 = parseStandardResponse(data3);
+					// if (st3.status.playback_state == 0)
+					// console.log('got p', data3, st3);
+					callback();
 				});
-
 			});
-
-		});
+		} else {
+			var begincommand = 'b' + writeUnsignedInt16(0) + writeUnsignedInt32(speed);
+			// console.log('Sending begin command: ' + JSON.stringify(begincommand) );
+			self._send(begincommand, STANDARD_RESPONSE_SIZE, function(data3) {
+				// var st3 = parseStandardResponse(data3);
+				// console.log('begin returned', st3.str);
+				self._send(packeddata, STANDARD_RESPONSE_SIZE, function(data) {
+					// var st3 = parseStandardResponse(data);
+					// console.log('buffer returned', st3.str);
+					// self.fullness = st3.status.buffer_fullness;
+					// self.points_in_buffer = st3.status.point_count;
+					self._send('p', STANDARD_RESPONSE_SIZE, function(data3) {
+						var st3 = parseStandardResponse(data3);
+						// console.log('play returned', st3.str);
+						self.fullness = st3.status.buffer_fullness;
+						self.points_in_buffer = st3.status.point_count;
+						// console.log('sent frame packet');
+						// var st3 = parseStandardResponse(data3);
+						// if (st3.status.playback_state == 0)
+						// console.log('got p', data3, st3);
+						self.playsent = true;
+						// waitack();
+						callback();
+					});
+				});
+			});
+		}
 	}
 
 	EtherConn.prototype.close = function() {
