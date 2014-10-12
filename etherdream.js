@@ -1,91 +1,100 @@
 (function(ns) {
-
 	/*
 
-	typedef struct dac_point {
-		uint16_t control;
-		int16_t x;
-		int16_t y;
-		uint16_t r;
-		uint16_t g;
-		uint16_t b;
-		uint16_t i;
-		uint16_t u1;
-		uint16_t u2;
-	} dac_point_t;
+	Driver python source:
 
-	struct etherdream_point {
-		int16_t x;
-		int16_t y;
-		uint16_t r;
-		uint16_t g;
-		uint16_t b;
-		uint16_t i;
-		uint16_t u1;
-		uint16_t u2;
-	}; // 4+4+4+4 = 16 bytes
+		http://ether-dream.com/sitter.py
 
-	struct dac_broadcast {
-		uint8_t mac_address[6];
-		uint16_t hw_revision;
-		uint16_t sw_revision;
-		uint16_t buffer_capacity;
-		uint32_t max_point_rate;
-	        struct dac_status status;
-	} __attribute__ ((packed));
 
-	struct begin_command {
-		uint8_t command;	// 'b' (0x62)
-		uint16_t low_water_mark;
-		uint32_t point_rate;
-	} __attribute__ ((packed));
+	Firmware sourcecode:
 
-	struct queue_command {
-		uint8_t command;	// 'q' (0x74)
-		uint32_t point_rate;
-	} __attribute__ ((packed));
+		https://github.com/j4cbo/j4cDAC/blob/master/common/protocol.h
 
-	struct data_command {
-		uint8_t command;	// 'd' (0x64)
-		uint16_t npoints;
-		struct dac_point data[];
-	} __attribute__ ((packed));
+		typedef struct dac_point {
+			uint16_t control;
+			int16_t x;
+			int16_t y;
+			uint16_t r;
+			uint16_t g;
+			uint16_t b;
+			uint16_t i;
+			uint16_t u1;
+			uint16_t u2;
+		} dac_point_t;
 
-	struct data_command_header {
-		uint8_t command;	// 'd' (0x64)
-		uint16_t npoints;
-	} __attribute__ ((packed));
+		struct etherdream_point {
+			int16_t x;
+			int16_t y;
+			uint16_t r;
+			uint16_t g;
+			uint16_t b;
+			uint16_t i;
+			uint16_t u1;
+			uint16_t u2;
+		}; // 4+4+4+4 = 16 bytes
 
-	struct dac_response {
-		uint8_t response;
-		uint8_t command;
-		struct dac_status dac_status;
-	} __attribute__ ((packed)); // 2 + 16
+		struct dac_broadcast {
+			uint8_t mac_address[6];
+			uint16_t hw_revision;
+			uint16_t sw_revision;
+			uint16_t buffer_capacity;
+			uint32_t max_point_rate;
+		        struct dac_status status;
+		} __attribute__ ((packed));
 
-	struct dac_status {
-		uint8_t protocol;
-		uint8_t light_engine_state;
-		uint8_t playback_state;
-		uint8_t source;
-		uint16_t light_engine_flags;
-		uint16_t playback_flags;
-		uint16_t source_flags;
-		uint16_t buffer_fullness;
-		uint32_t point_rate;
-		uint32_t point_count;
-	} __attribute__ ((packed)); // 20 bytes 4+4+4+4+4
+		struct begin_command {
+			uint8_t command;	// 'b' (0x62)
+			uint16_t low_water_mark;
+			uint32_t point_rate;
+		} __attribute__ ((packed));
 
-	#define RESP_ACK		'a'
-	#define RESP_NAK_FULL		'F'
-	#define RESP_NAK_INVL		'I'
-	#define RESP_NAK_ESTOP		'!'
+		struct queue_command {
+			uint8_t command;	// 'q' (0x74)
+			uint32_t point_rate;
+		} __attribute__ ((packed));
 
-	#define CONNCLOSED_USER		(1)
-	#define CONNCLOSED_UNKNOWNCMD	(2)
-	#define CONNCLOSED_SENDFAIL	(3)
-	#define CONNCLOSED_MASK		(0xF)
+		struct data_command {
+			uint8_t command;	// 'd' (0x64)
+			uint16_t npoints;
+			struct dac_point data[];
+		} __attribute__ ((packed));
 
-	#define DAC_CTRL_RATE_CHANGE    0x8000
+		struct data_command_header {
+			uint8_t command;	// 'd' (0x64)
+			uint16_t npoints;
+		} __attribute__ ((packed));
+
+		struct dac_response {
+			uint8_t response;
+			uint8_t command;
+			struct dac_status dac_status;
+		} __attribute__ ((packed)); // 2 + 16
+
+		struct dac_status {
+			uint8_t protocol;
+			uint8_t light_engine_state;
+			uint8_t playback_state;
+			uint8_t source;
+			uint16_t light_engine_flags;
+			uint16_t playback_flags;
+			uint16_t source_flags;
+			uint16_t buffer_fullness;
+			uint32_t point_rate;
+			uint32_t point_count;
+		} __attribute__ ((packed)); // 20 bytes 4+4+4+4+4
+
+		#define RESP_ACK		'a'
+		#define RESP_NAK_FULL		'F'
+		#define RESP_NAK_INVL		'I'
+		#define RESP_NAK_ESTOP		'!'
+
+		#define CONNCLOSED_USER		(1)
+		#define CONNCLOSED_UNKNOWNCMD	(2)
+		#define CONNCLOSED_SENDFAIL	(3)
+		#define CONNCLOSED_MASK		(0xF)
+
+		#define DAC_CTRL_RATE_CHANGE    0x8000
+
 	*/
 
 	var dgram = require('dgram');
@@ -122,6 +131,8 @@
 				point_count: parseUInt32(data[18],data[19],data[20],data[21])
 			}
 		};
+		// console.log('parseStandardResponse', st);
+		// console.log('response; fullness=' + st.status.buffer_fullness + ', response=' + st.response + ', command=' +st.command + ', playback_flags=' + st.status.playback_flags);
 		st.success = st.response == 'a';
 		st.str = 'resp='+st.response+',fullness='+st.status.buffer_fullness+',raw='+data;
 		return st;
@@ -129,72 +140,38 @@
 
 	var EtherConn = function(ip) {
 		var self = this;
-		this.queue = [];
 		this.inputqueue = [];
+		this.inputhandlerqueue = [];
 		this.timer = 0;
 		this.acks = 0;
 		this.fullness = 0;
 		this.points_in_buffer = 0;
-		this.begun = false;
+		this.playback_state = 0;
 		this.playsent = false;
+		this.beginsent = false;
+		this.preparesent = false;
+		this.valid = true;
 		this._send = function(sendcommand, responsesize, sendcallback) {
-			self.queue.push({
-				sent: false,
-				received: false,
-				responsesize: responsesize,
-				command: sendcommand,
-				callback: sendcallback
-			});
-		};
-		this._popqueue = function() {
-			// pending command?
-			if (self.currentcommand != null) {
-				return;
-			}
-			// pop one.
-			if (self.queue.length > 0) {
-				self.currentcommand = self.queue.splice(0, 1)[0];
-				self.currentcommand.sent = true;
-				if (self.currentcommand.command != null) {
-
-					var buf = new Buffer(self.currentcommand.command, 'binary');
-
-					// console.log('SENDING: '+JSON.stringify(self.currentcommand.command));
-					// for( var i=0; i<buf.length; i++)
-					// 	if (i<100)
-					// 		console.log('buf',i,buf[i]);
-					// console.log('\n\n');
-					self.client.write(buf);
-				}
-			}
+			this.client.write(new Buffer(sendcommand, 'binary'));
+			this._popinputqueue();
 		};
 		this._popinputqueue = function() {
-			if (self.currentcommand != null) {
-				if (self.currentcommand.sent && !self.currentcommand.received) {
-					if (self.inputqueue.length >= self.currentcommand.responsesize) {
-						var response = self.inputqueue.splice(0, self.currentcommand.responsesize);
-
-						self.currentcommand.received = true;
-						self.currentcommand.callback(response);
-						self.currentcommand = null;
-
-						setTimeout(function() {
-							self._popqueue();
-						}, 0);
-					}
+			if (this.inputhandlerqueue.length > 0) {
+				var handler = this.inputhandlerqueue[0];
+				if (this.inputqueue.length >= handler.size) {
+					// console.log('we got enough input bytes');
+					var response = this.inputqueue.splice(0, handler.size);
+					this.inputhandlerqueue.splice(0, 1);
+					handler.callback(response);
 				}
 			}
-			if (self.inputqueue.length > 0) {
-				setTimeout(function() {
-					self._popinputqueue();
-				}, 0);
-			}
 		}
-		// this._queuecomm
 	}
 
 	EtherConn.prototype.connect = function(ip, port, callback) {
 		var self = this;
+
+		console.log('SOCKET: Connecting to ' + ip + ':' + port + ' ...');
 
 		this.client = net.connect(
 			{
@@ -204,27 +181,35 @@
 			function() {
 				//'connect' listener
 				console.log('SOCKET CONNECT: client connected');
+				// self.sendPing(function() {
+				//	callback(true);
+				// });
 
-				self._send('?', STANDARD_RESPONSE_SIZE, function(data) {
+				self.waitForResponse(STANDARD_RESPONSE_SIZE, function(data) {
 					var st = parseStandardResponse(data);
+					// console.log('got connect response', st);
+					self.handleStandardResponse(st);
 					callback(true);
 				});
 
-				self._popqueue();
+				// self._popqueue();
+				self._popinputqueue();
 			}
 		);
 
 		this.client.on('data', function(data) {
+			// console.log('SOCKET got ' + data.length + ' bytes');
 			// console.log('SOCKET DATA:', data.toString(), data.length, self.currentcommand);
 			// console.log('\n\n');
 			for(var i=0; i<data.length; i++)
 				self.inputqueue.push(data[i]);
-			self._popinputqueue();
+			setTimeout(function() {
+				self._popinputqueue();
+			}, 0);
 		});
 
 		this.client.on('error', function(data) {
 			console.log('SOCKET ERROR:', data.toString());
-
 			setTimeout(function() {
 				callback(false);
 			}, 0);
@@ -266,125 +251,213 @@
 		return String.fromCharCode(a) + String.fromCharCode(b);
 	}
 
-	EtherConn.prototype.write = function(data, speed, callback) {
+	EtherConn.prototype.waitForResponse = function(size, callback) {
+		// console.log('Setting up responder for ' + size + ' bytes...');
+		this.inputhandlerqueue.push({
+			size: size,
+			callback: callback
+		});
+		this._popinputqueue();
+	}
 
-		// console.log('sending points');
-		// console.log('n-points', data.length);
-		// console.log('draw rate', speed);
+	EtherConn.prototype.sendPrepare = function(callback) {
+		// console.log('send prepare command');
+		var _this = this;
+		var cmd = 'p';
+		this._send(cmd);
+		this.waitForResponse(STANDARD_RESPONSE_SIZE, function(data) {
+			var st = parseStandardResponse(data);
+			_this.handleStandardResponse(st);
+			_this.preparesent = true;
+			callback();
+		});
+	}
 
-		// data[0].control = (data[0].control || 0) | DAC_CTRL_RATE_CHANGE;
+	EtherConn.prototype.handleStandardResponse = function(data) {
+		this.fullness = data.status.buffer_fullness;
+		this.playback_state = data.status.playback_state;
+		this.valid = data.response == 'a';
+		if (data.status.playback_flags == 2) {
+			console.error('Laser buffer underrun.');
+			// buffer underrun flagged.
+			this.beginsent = false;
+		}
+	}
 
-		// queue command
-		// packeddata += 'q';
-		// packeddata += writeUnsignedInt16(speed); // rate
-		// packeddata += writeUnsignedInt16(0); // low watermark?
-		// packeddata += writeUnsignedInt32(speed); // rate
-		// this.acks ++;
+	EtherConn.prototype.sendBegin = function(rate, callback) {
+		// console.log('send begin command');
+		var _this = this;
+		var lwm = 0;
+		var cmd = 'b' + writeUnsignedInt16(lwm) + writeUnsignedInt32(rate);
+		this._send(cmd);
+		this.waitForResponse(STANDARD_RESPONSE_SIZE, function(data) {
+			var st = parseStandardResponse(data);
+			_this.handleStandardResponse(st);
+			_this.beginsent = true;
+			callback();
+		});
+	}
 
-		var self = this;
-		var packeddata = '';
+	EtherConn.prototype.sendUpdate = function(rate, callback) {
+		// console.log('send update command');
+		var _this = this;
+		var lwm = 0;
+		var cmd = 'u' + writeUnsignedInt16(lwm) + writeUnsignedInt32(rate);
+		this._send(cmd);
+		this.waitForResponse(STANDARD_RESPONSE_SIZE, function(data) {
+			var st = parseStandardResponse(data);
+			_this.handleStandardResponse(st);
+			_this.beginsent = true;
+			callback();
+		});
+	}
 
-		var offset = 0;
-		// var left = data.length;
+	EtherConn.prototype.sendStop = function(callback) {
+		// console.log('send stop command');
+		var _this = this;
+		var cmd = 's';
+		this._send(cmd);
+		this.waitForResponse(STANDARD_RESPONSE_SIZE, function(data) {
+			var st = parseStandardResponse(data);
+			_this.handleStandardResponse(st);
+			callback();
+		});
+	}
 
-		// while(offset < data.length) {
+	EtherConn.prototype.sendEmergencyStop = function(callback) {
+		var _this = this;
+		var cmd = '\xFF';
+		this._send(cmd);
+		this.waitForResponse(STANDARD_RESPONSE_SIZE, function(data) {
+			var st = parseStandardResponse(data);
+			_this.handleStandardResponse(st);
+			callback();
+		});
+	}
 
-		var batch = data.length; // Math.min( 50000, left ); // data.length
-		// if (batch > 0) {
-		// var offset = 0;
-		// data command header
-		packeddata += 'd';
-		packeddata += writeUnsignedInt16(batch); // npoints
+	EtherConn.prototype.sendPing = function(callback) {
+		// console.log('send ping command');
+		var _this = this;
+		var cmd = '?';
+		this._send(cmd);
+		this.waitForResponse(STANDARD_RESPONSE_SIZE, function(data) {
+			var st = parseStandardResponse(data);
+			_this.handleStandardResponse(st);
+			callback();
+		});
+	}
 
-		// points
+	EtherConn.prototype.sendPoints = function(points, callback) {
+		// console.log('send points command, n=' + points.length);
+		var _this = this;
+		var batch = points.length;
+		cmd = 'd' + writeUnsignedInt16(batch);
 		for (var i=0; i<batch; i++) {
-			var p = data[offset + i];
-			packeddata += writeUnsignedInt16(p.control || 0);
-			packeddata += writeSignedInt16(p.x || 0);
-			packeddata += writeSignedInt16(p.y || 0);
-			packeddata += writeUnsignedInt16(p.r || 0);
-			packeddata += writeUnsignedInt16(p.g || 0);
-			packeddata += writeUnsignedInt16(p.b || 0);
-			packeddata += writeUnsignedInt16(p.i || 0);
-			packeddata += writeUnsignedInt16(p.u1 || 0);
-			packeddata += writeUnsignedInt16(p.u2 || 0);
+			var p = points[i];
+			cmd += writeUnsignedInt16(p.control || 0);
+			cmd += writeSignedInt16(p.x || 0);
+			cmd += writeSignedInt16(p.y || 0);
+			cmd += writeUnsignedInt16(p.r || 0);
+			cmd += writeUnsignedInt16(p.g || 0);
+			cmd += writeUnsignedInt16(p.b || 0);
+			cmd += writeUnsignedInt16(p.i || 0);
+			cmd += writeUnsignedInt16(p.u1 || 0);
+			cmd += writeUnsignedInt16(p.u2 || 0);
 		}
-
-		// left -= batch;
-		// offset += batch;
-
-		// self.acks ++;
-		// }
-		// }
-
-		/*
-		function waitack() {
-			// console.log('waiting for '+self.acks+' acks...');
-			self._send(null, STANDARD_RESPONSE_SIZE, function(data2) {
-				var st = parseStandardResponse(data2);
-				// console.log('got ack?', st);
-				if ((st.response == 'a' || st.response == 'I') && st.command == 'd') {
-					self.acks --;
-					if (self.acks > 0) {
-						// var st2 = parseStandardResponse(data2);
-						// console.log('got status 2', data2, st2);
-						setTimeout(function() {
-							waitack();
-						}, CALLBACK_DELAY);
-					} else {
-						setTimeout(function() {
-							callback(self);
-						}, CALLBACK_DELAY);
-					}
-				}
-			});
-		}
-		*/
-
-		if (self.playsent) {
-			self._send(packeddata, STANDARD_RESPONSE_SIZE, function(data) {
-				// var st3 = parseStandardResponse(data);
-				// console.log('buffer returned', st3.str);
-				// console.log('sent frame packet');
-				// waitack();
-				self._send('p', STANDARD_RESPONSE_SIZE, function(data3) {
-					var st3 = parseStandardResponse(data3);
-					// console.log('play returned', st3.str);
-					self.fullness = st3.status.buffer_fullness;
-					self.points_in_buffer = st3.status.point_count;
-					// var st3 = parseStandardResponse(data3);
-					// if (st3.status.playback_state == 0)
-					// console.log('got p', data3, st3);
+		this._send(cmd);
+		this.waitForResponse(STANDARD_RESPONSE_SIZE, function(data) {
+			var st = parseStandardResponse(data);
+			_this.handleStandardResponse(st);
+			if (_this.valid) {
+				// console.log('points sent.');
+				if (!_this.beginsent) {
+					_this.sendBegin(_this.rate, callback);
+				} else {
 					callback();
-				});
+				}
+			} else {
+				callback();
+			}
+
+
+		});
+	}
+
+	EtherConn.prototype.pollGotData = function(framedata) {
+		var _this = this;
+		// console.log('Send ' + framedata.length + ' points to DAC');
+		if (framedata.length > 0) {
+			this.sendPoints(framedata, function() {
+				setTimeout(function() {
+					_this.pollStream();
+				}, 0);
 			});
 		} else {
-			var begincommand = 'b' + writeUnsignedInt16(0) + writeUnsignedInt32(speed);
-			// console.log('Sending begin command: ' + JSON.stringify(begincommand) );
-			self._send(begincommand, STANDARD_RESPONSE_SIZE, function(data3) {
-				// var st3 = parseStandardResponse(data3);
-				// console.log('begin returned', st3.str);
-				self._send(packeddata, STANDARD_RESPONSE_SIZE, function(data) {
-					// var st3 = parseStandardResponse(data);
-					// console.log('buffer returned', st3.str);
-					// self.fullness = st3.status.buffer_fullness;
-					// self.points_in_buffer = st3.status.point_count;
-					self._send('p', STANDARD_RESPONSE_SIZE, function(data3) {
-						var st3 = parseStandardResponse(data3);
-						// console.log('play returned', st3.str);
-						self.fullness = st3.status.buffer_fullness;
-						self.points_in_buffer = st3.status.point_count;
-						// console.log('sent frame packet');
-						// var st3 = parseStandardResponse(data3);
-						// if (st3.status.playback_state == 0)
-						// console.log('got p', data3, st3);
-						self.playsent = true;
-						// waitack();
-						callback();
+			setTimeout(function() {
+				_this.pollStream();
+			}, 0);
+		}
+	}
+
+	EtherConn.prototype.pollStream = function() {
+		var _this = this;
+		if (this.playback_state == 0) {
+			this.sendPrepare(function() {
+				// prepare first.
+				setTimeout(_this.pollStream.bind(_this), 0);
+			});
+		} else if (!this.valid) {
+			setTimeout(function() {
+				this.sendPrepare(function() {
+					this.sendBegin(this.rate, function() {
+						setTimeout(_this.pollStream.bind(_this), 0);
 					});
 				});
-			});
+			}, 250);
+		} else {
+			var MAX = 1799; // 1799;
+			var N = Math.max(0, MAX - this.fullness);
+			// console.log('Asking for '+N+' items..');
+			if( N > 50 ) {
+				setTimeout(_this.streamSource.bind(null, N, _this.pollGotData.bind(_this)), 0);
+			} else {
+				this.sendPing(function() {
+					setTimeout(_this.pollStream.bind(_this), 0);
+				});
+			}
 		}
+	}
+
+	EtherConn.prototype.streamPoints = function(rate, pointSource) {
+		var _this = this;
+		this.streamSource = pointSource;
+		this.rate = rate;
+		this.sendStop(function() {
+			setTimeout(_this.pollStream.bind(_this), 0);
+		});
+	}
+
+	EtherConn.prototype.streamFrames = function(rate, frameSource) {
+		var _this = this;
+		this.frameSource = frameSource;
+		this.frameBuffer = [];
+
+		function innerStream(numpoints, pointcallback) {
+			if (_this.frameBuffer.length < numpoints) {
+				_this.frameSource(function(points) {
+					for(var i=0; i<points.length; i++) {
+						_this.frameBuffer.push(points[i]);
+					}
+					// get another frame if we need to...
+					setTimeout(innerStream.bind(_this, numpoints, pointcallback), 0);
+				});
+			} else {
+				var points = _this.frameBuffer.splice(0, numpoints);
+				pointcallback(points);
+			}
+		}
+
+		this.streamPoints(rate, innerStream);
 	}
 
 	EtherConn.prototype.close = function() {
@@ -393,16 +466,19 @@
 		}
 	}
 
-
-
 	var EtherDream = {};
 
-	EtherDream.find = function(callback) {
+	EtherDream._find = function(limit, timeout, callback) {
 
 		var ips = [];
 		var all = [];
 
 		var server = dgram.createSocket("udp4");
+
+		var timeouttimer = setTimeout(function() {
+			server.close();
+			callback(all);
+		}, timeout);
 
 		server.on("message", function (msg, rinfo) {
 
@@ -433,16 +509,26 @@
 				hw_revision: msg[6],
 				sw_revision: msg[7],
 			});
+
+			if (all.length >= limit) {
+				server.close();
+				clearTimeout(timeouttimer);
+				callback(all);
+			}
 		});
 
 		server.bind(7654);
 
 		// wait two seconds for data to come back...
 
-		setTimeout(function() {
-			server.close();
-			callback(all);
-		}, 1500);
+	}
+
+	EtherDream.find = function(callback) {
+		this._find(99, 2000, callback);
+	}
+
+	EtherDream.findFirst = function(callback) {
+		this._find(1, 4000, callback);
 	}
 
 	EtherDream.connect = function(ip, port, callback) {
