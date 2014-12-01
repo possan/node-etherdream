@@ -408,8 +408,8 @@
 			});
 		} else if (!this.valid) {
 			setTimeout(function() {
-				this.sendPrepare(function() {
-					this.sendBegin(this.rate, function() {
+				_this.sendPrepare(function() {
+					_this.sendBegin(_this.rate, function() {
 						setTimeout(_this.pollStream.bind(_this), 0);
 					});
 				});
