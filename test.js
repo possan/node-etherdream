@@ -47,6 +47,7 @@ EtherDream.findFirst(function(all) {
 				pt.r = colorsin(ip + phase);
 				pt.g = colorsin(ip + phase * 3);
 				pt.b = colorsin(ip + phase * 2 );
+				// pt.blanking = false;
 				framedata.push(pt);
 				i += 0.1;
 				phase += 0.1 / 3250.0;

@@ -150,6 +150,7 @@
 		this.playsent = false;
 		this.beginsent = false;
 		this.preparesent = false;
+		this.underruncounter = 0;
 		this.valid = true;
 		this._send = function(sendcommand, responsesize, sendcallback) {
 			this.client.write(new Buffer(sendcommand, 'binary'));
@@ -278,7 +279,8 @@
 		this.playback_state = data.status.playback_state;
 		this.valid = data.response == 'a';
 		if (data.status.playback_flags == 2) {
-			console.error('Laser buffer underrun.');
+			this.underruncounter ++;
+			console.error('Laser buffer underrun #' + this.underruncounter);
 			// buffer underrun flagged.
 			this.beginsent = false;
 		}
@@ -413,12 +415,12 @@
 						setTimeout(_this.pollStream.bind(_this), 0);
 					});
 				});
-			}, 250);
+			}, 10);
 		} else {
 			var MAX = 1799; // 1799;
 			var N = Math.max(0, MAX - this.fullness);
 			// console.log('Asking for '+N+' items..');
-			if( N > 50 ) {
+			if( N > 1 ) {
 				setTimeout(_this.streamSource.bind(null, N, _this.pollGotData.bind(_this)), 0);
 			} else {
 				this.sendPing(function() {
